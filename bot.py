@@ -50,20 +50,27 @@ BTN = {
     "اعتماد ورقة": "/ok_paper",
     "حذف ورقة": "/delete",
     "اختيار امتحان": "/use",
+    "المزيد": "/more",
+    "رجوع": "/menu",
     "مساعدة": "/help",
     "إلغاء": "/cancel",
 }
 
+# لوحة قصيرة حتى لا تغطيها أزرار نظام الهاتف
 MAIN_KB = [
     ["تحضير درس", "امتحان جديد"],
     ["ورقة ورقة", "طابور أوراق"],
+    ["تقرير الصف", "اعتماد النتائج"],
+    ["المزيد", "مساعدة", "إلغاء"],
+]
+
+MORE_KB = [
     ["تم السلم", "اعتماد السلم", "تم الدرس"],
-    ["اعتماد التحضير", "تقرير الصف", "التالي للمراجعة"],
-    ["حالة الطابور", "الأوراق", "للمراجعة"],
-    ["تصدير CSV", "اعتماد النتائج", "إيقاف الطابور"],
+    ["اعتماد التحضير", "التالي للمراجعة", "للمراجعة"],
+    ["الأوراق", "حالة الطابور", "تصدير CSV"],
     ["عرض ورقة", "اعتماد ورقة", "حذف ورقة"],
     ["تعديل علامة", "تعديل اسم", "اختيار امتحان"],
-    ["الامتحانات", "مساعدة", "إلغاء"],
+    ["الامتحانات", "إيقاف الطابور", "رجوع"],
 ]
 
 KEY_KB = [["تم السلم", "إلغاء"], ["مساعدة"]]
@@ -72,7 +79,7 @@ LESSON_KB = [["تم الدرس", "إلغاء"], ["مساعدة"]]
 LESSON_ASK_KB = [["إلغاء"], ["مساعدة"]]
 LESSON_OK_KB = [["اعتماد التحضير", "إلغاء"], ["مساعدة"]]
 REVIEW_KB = [["التالي للمراجعة", "اعتماد ورقة", "تعديل علامة"],
-             ["تعديل اسم", "تقرير الصف", "إلغاء"]]
+             ["تعديل اسم", "تقرير الصف", "رجوع"]]
 
 NEED_ARG = {
     "/show": "أرسل رقم الورقة (مثال: 3)",
@@ -105,6 +112,7 @@ class Bot:
         self.batch = {}      # chat -> progress stats
         self.busy = set()    # chats currently grading one paper
         self.grade_mode = {} # chat -> "one" | "batch"  (افتراضي: ورقة ورقة)
+        self.menu = {}       # chat -> "main" | "more"
 
     def has_work(self):
         return bool(self.pending or any(self.queue.values()) or self.busy)
@@ -130,6 +138,8 @@ class Bot:
             return LESSON_OK_KB
         if mode == "reviewing":
             return REVIEW_KB
+        if self.menu.get(chat) == "more":
+            return MORE_KB
         return MAIN_KB
 
     def _send(self, chat, text, keyboard=None):
@@ -313,7 +323,16 @@ class Bot:
     def command(self, chat, cmd, arg):
         s, tg = self.store, self.tg
         if cmd in ("/start", "/help"):
+            self.menu[chat] = "main"
             return self._send(chat, HELP + f"\n\nالوضع الحالي: «{self._mode_label(chat)}»", keyboard=MAIN_KB)
+        if cmd == "/more":
+            self.menu[chat] = "more"
+            return self._send(chat, "أزرار إضافية — اضغط «رجوع» للقائمة المختصرة.", keyboard=MORE_KB)
+        if cmd == "/menu":
+            self.menu[chat] = "main"
+            if (self.state.get(chat) or {}).get("mode") == "reviewing":
+                self.state.pop(chat, None)
+            return self._send(chat, "القائمة الرئيسية.", keyboard=MAIN_KB)
         if cmd == "/mode_one":
             self.grade_mode[chat] = "one"
             return self._send(chat, "✅ تم تفعيل وضع «ورقة ورقة».\n"
@@ -325,6 +344,7 @@ class Bot:
         if cmd == "/cancel":
             self.state.pop(chat, None)
             self.pending.pop(chat, None)
+            self.menu[chat] = "main"
             return self._send(chat, "تم الإلغاء (الطابور ما انمسح — استخدم «إيقاف الطابور» إن لزم).",
                               keyboard=MAIN_KB)
         if cmd == "/stop_queue":
