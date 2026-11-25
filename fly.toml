@@ -1,0 +1,35 @@
+# نشر على Fly.io (طبقة مجانية محدودة — مناسب لبوت واحد صغير)
+# الخطوات في README أو الرسائل: fly launch / fly secrets / fly deploy
+
+app = "examgrader-sha3ban"
+primary_region = "fra"
+
+[build]
+
+[env]
+  PYTHONUNBUFFERED = "1"
+  DB_PATH = "/data/examgrader.db"
+  TAHDEER_FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+  LLM_PROVIDER = "gemini"
+  GEMINI_MODEL = "gemini-3.5-flash"
+
+[processes]
+  app = "python bot.py"
+
+[[mounts]]
+  source = "examdata"
+  destination = "/data"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+  cpus = 1
+
+# البوت عملية polling — لازم ما ينطفئ تلقائياً
+# عُطّل autostop على الجهاز: fly machine update <id> --autostop=off
+[deploy]
+  strategy = "immediate"
+
+[[restart]]
+  policy = "always"
+  retries = 10

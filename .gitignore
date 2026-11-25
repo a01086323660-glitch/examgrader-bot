@@ -1,0 +1,9 @@
+.env
+*.db
+__pycache__/
+*.pyc
+.venv/
+venv/
+sample_lesson.pdf
+*.log
+.DS_Store
